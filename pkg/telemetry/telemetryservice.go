@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/livekit/livekit-server/pkg/utils"
+	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/codecs/mime"
 	"github.com/livekit/protocol/livekit"
 	"github.com/livekit/protocol/logger"
@@ -180,7 +181,8 @@ type statsWorkerKey struct {
 type telemetryService struct {
 	AnalyticsService
 
-	notifier  webhook.QueuedNotifier
+	notifier     webhook.QueuedNotifier
+	keyProvider  auth.KeyProvider
 	jobsQueue *utils.OpsQueue
 
 	workersMu  sync.RWMutex
@@ -190,10 +192,11 @@ type telemetryService struct {
 	flushMu sync.Mutex
 }
 
-func NewTelemetryService(notifier webhook.QueuedNotifier, analytics AnalyticsService) TelemetryService {
+func NewTelemetryService(notifier webhook.QueuedNotifier, keyProvider auth.KeyProvider, analytics AnalyticsService) TelemetryService {
 	t := &telemetryService{
 		AnalyticsService: analytics,
 		notifier:         notifier,
+		keyProvider:      keyProvider,
 		jobsQueue: utils.NewOpsQueue(utils.OpsQueueParams{
 			Name:        "telemetry",
 			MinSize:     jobsQueueMinSize,

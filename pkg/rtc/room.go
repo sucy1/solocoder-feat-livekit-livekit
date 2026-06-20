@@ -364,22 +364,26 @@ func (r *Room) cancelAutoDeleteLocked() {
 	}
 }
 
-func (r *Room) scheduleAutoDeleteIfEmptyLocked() {
+func (r *Room) scheduleAutoDeleteIfEmptyLocked() bool {
 	if r.IsClosed() || r.holds.Load() > 0 {
-		return
+		return false
 	}
 
 	for _, p := range r.participants {
 		if !p.IsDependent() {
-			return
+			return false
 		}
 	}
 
-	if r.autoDeleteDelay <= 0 {
-		return
+	if r.autoDeleteDelay < 0 {
+		return false
 	}
 
 	r.cancelAutoDeleteLocked()
+
+	if r.autoDeleteDelay == 0 {
+		return true
+	}
 
 	r.autoDeleteTimer = time.AfterFunc(r.autoDeleteDelay, func() {
 		r.lock.Lock()
@@ -399,6 +403,7 @@ func (r *Room) scheduleAutoDeleteIfEmptyLocked() {
 		r.Close(types.ParticipantCloseReasonRoomClosed)
 		r.logger.Infow("closing idle room due to auto delete delay", "delay", r.autoDeleteDelay)
 	})
+	return false
 }
 
 func (r *Room) Logger() logger.Logger {
@@ -1520,8 +1525,16 @@ func (r *Room) RemoveParticipant(
 			immediateChange = true
 		}
 	}
+
+	closeImmediately := r.scheduleAutoDeleteIfEmptyLocked()
+
 	r.lock.Unlock()
 	r.protoProxy.MarkDirty(immediateChange)
+
+	if closeImmediately {
+		r.Close(types.ParticipantCloseReasonRoomClosed)
+		r.logger.Infow("closing idle room immediately due to auto delete delay")
+	}
 
 	if !p.HasConnected() {
 		fields := append(
@@ -1562,8 +1575,6 @@ func (r *Room) RemoveParticipant(
 	_ = p.Close(true, reason, false)
 
 	r.leftAt.Store(time.Now().Unix())
-
-	r.scheduleAutoDeleteIfEmptyLocked()
 
 	if sendUpdates {
 		if r.onParticipantChanged != nil {

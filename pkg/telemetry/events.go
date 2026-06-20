@@ -15,7 +15,17 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/tls"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -244,19 +254,33 @@ func (t *telemetryService) ParticipantMetadataUpdated(
 }
 
 func (t *telemetryService) NotifyEventAtURL(ctx context.Context, event *livekit.WebhookEvent, url string) {
-	if t.notifier == nil || url == "" {
+	if t.keyProvider == nil || url == "" {
 		return
 	}
 
 	event.CreatedAt = time.Now().Unix()
 	event.Id = guid.New("EV_")
 
-	var err error
+	payload, err := json.Marshal(event)
+	if err != nil {
+		logger.Warnw("failed to marshal webhook event", err, "event", event.Event, "url", url)
+		return
+	}
+
+	apiKey, secret := t.getKeyAndSecret()
+	if secret == "" {
+		logger.Warnw("no secret for webhook signing", nil, "event", event.Event, "url", url)
+		return
+	}
+
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	signature := signPayload(payload, secret, timestamp)
+
 	for i := 0; i < maxWebhookRetries; i++ {
 		if i > 0 {
 			time.Sleep(webhookRetryInterval)
 		}
-		err = t.notifier.QueueNotify(ctx, event, webhook.WithURL(url))
+		err = sendWebhook(ctx, url, apiKey, signature, timestamp, payload)
 		if err == nil {
 			return
 		}
@@ -265,6 +289,61 @@ func (t *telemetryService) NotifyEventAtURL(ctx context.Context, event *livekit.
 	if err != nil {
 		logger.Warnw("failed to notify webhook after retries", err, "event", event.Event, "url", url)
 	}
+}
+
+func (t *telemetryService) getKeyAndSecret() (string, string) {
+	if t.keyProvider == nil {
+		return "", ""
+	}
+
+	numKeys := t.keyProvider.NumKeys()
+	if numKeys == 0 {
+		return "", ""
+	}
+
+	return "", t.keyProvider.GetSecret("")
+}
+
+func signPayload(payload []byte, secret string, timestamp string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(timestamp))
+	h.Write([]byte("."))
+	h.Write(payload)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func sendWebhook(ctx context.Context, url, apiKey, signature, timestamp string, payload []byte) error {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: false,
+			},
+		},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-LK-Signature", "sha256="+signature)
+	req.Header.Set("X-LK-Timestamp", timestamp)
+	if apiKey != "" {
+		req.Header.Set("X-LK-API-KEY", apiKey)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("webhook returned non-success status: %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 func (t *telemetryService) TrackPublishRequested(

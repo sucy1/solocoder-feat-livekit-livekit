@@ -289,6 +289,7 @@ func NewStreamAllocator(params StreamAllocatorParams, enabled bool, allowPause b
 		clientBandwidthEstimatorEnabled: params.BandwidthEstimator.Enabled,
 		clientBandwidthEstimateCycle:    estimateCycle,
 		maxBitratePct:                   maxBitratePct,
+		clientEstimatedBandwidth:        1_000_000,
 		eventsQueue: utils.NewTypedOpsQueue[Event](utils.OpsQueueParams{
 			Name:    "stream-allocator",
 			MinSize: 64,

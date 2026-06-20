@@ -77,6 +77,11 @@ type FakeParticipantTelemetryListener struct {
 		arg3 mime.MimeType
 		arg4 *livekit.RTPStats
 	}
+	OnParticipantMetadataUpdatedStub        func(types.Participant)
+	onParticipantMetadataUpdatedMutex       sync.RWMutex
+	onParticipantMetadataUpdatedArgsForCall []struct {
+		arg1 types.Participant
+	}
 	OnTrackSubscribeRequestedStub        func(livekit.ParticipantID, *livekit.TrackInfo)
 	onTrackSubscribeRequestedMutex       sync.RWMutex
 	onTrackSubscribeRequestedArgsForCall []struct {
@@ -429,6 +434,38 @@ func (fake *FakeParticipantTelemetryListener) OnTrackSubscribeRTPStatsArgsForCal
 	defer fake.onTrackSubscribeRTPStatsMutex.RUnlock()
 	argsForCall := fake.onTrackSubscribeRTPStatsArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakeParticipantTelemetryListener) OnParticipantMetadataUpdated(arg1 types.Participant) {
+	fake.onParticipantMetadataUpdatedMutex.Lock()
+	fake.onParticipantMetadataUpdatedArgsForCall = append(fake.onParticipantMetadataUpdatedArgsForCall, struct {
+		arg1 types.Participant
+	}{arg1})
+	stub := fake.OnParticipantMetadataUpdatedStub
+	fake.recordInvocation("OnParticipantMetadataUpdated", []interface{}{arg1})
+	fake.onParticipantMetadataUpdatedMutex.Unlock()
+	if stub != nil {
+		fake.OnParticipantMetadataUpdatedStub(arg1)
+	}
+}
+
+func (fake *FakeParticipantTelemetryListener) OnParticipantMetadataUpdatedCallCount() int {
+	fake.onParticipantMetadataUpdatedMutex.RLock()
+	defer fake.onParticipantMetadataUpdatedMutex.RUnlock()
+	return len(fake.onParticipantMetadataUpdatedArgsForCall)
+}
+
+func (fake *FakeParticipantTelemetryListener) OnParticipantMetadataUpdatedCalls(stub func(types.Participant)) {
+	fake.onParticipantMetadataUpdatedMutex.Lock()
+	defer fake.onParticipantMetadataUpdatedMutex.Unlock()
+	fake.OnParticipantMetadataUpdatedStub = stub
+}
+
+func (fake *FakeParticipantTelemetryListener) OnParticipantMetadataUpdatedArgsForCall(i int) types.Participant {
+	fake.onParticipantMetadataUpdatedMutex.RLock()
+	defer fake.onParticipantMetadataUpdatedMutex.RUnlock()
+	argsForCall := fake.onParticipantMetadataUpdatedArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *FakeParticipantTelemetryListener) OnTrackSubscribeRequested(arg1 livekit.ParticipantID, arg2 *livekit.TrackInfo) {

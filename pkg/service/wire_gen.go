@@ -79,7 +79,7 @@ func InitializeServer(conf *config.Config, currentNode routing.LocalNode) (*Live
 		return nil, err
 	}
 	analyticsService := telemetry.NewAnalyticsService(conf, currentNode)
-	telemetryService := createTelemetryService(queuedNotifier, analyticsService)
+	telemetryService := createTelemetryService(queuedNotifier, keyProvider, analyticsService)
 	ioInfoService, err := NewIOInfoService(messageBus, egressStore, ingressStore, sipStore, telemetryService)
 	if err != nil {
 		return nil, err
@@ -232,8 +232,8 @@ func createWebhookNotifier(conf *config.Config, provider auth.KeyProvider) (webh
 	return webhook.NewDefaultNotifier(wc, provider)
 }
 
-func createTelemetryService(notifier webhook.QueuedNotifier, analytics telemetry.AnalyticsService) telemetry.TelemetryService {
-	svc := telemetry.NewTelemetryService(notifier, analytics)
+func createTelemetryService(notifier webhook.QueuedNotifier, provider auth.KeyProvider, analytics telemetry.AnalyticsService) telemetry.TelemetryService {
+	svc := telemetry.NewTelemetryService(notifier, provider, analytics)
 	if notifier != nil {
 		notifier.RegisterProcessedHook(svc.Webhook)
 	}

@@ -83,6 +83,13 @@ type FakeTelemetryService struct {
 		arg2 string
 		arg3 *livekit.EgressInfo
 	}
+	NotifyEventAtURLStub        func(context.Context, *livekit.WebhookEvent, string)
+	notifyEventAtURLMutex       sync.RWMutex
+	notifyEventAtURLArgsForCall []struct {
+		arg1 context.Context
+		arg2 *livekit.WebhookEvent
+		arg3 string
+	}
 	ParticipantActiveStub        func(context.Context, *livekit.Room, *livekit.ParticipantInfo, *livekit.AnalyticsClientMeta, bool, *telemetry.ReferenceGuard)
 	participantActiveMutex       sync.RWMutex
 	participantActiveArgsForCall []struct {
@@ -112,6 +119,13 @@ type FakeTelemetryService struct {
 		arg3 *livekit.ParticipantInfo
 		arg4 bool
 		arg5 *telemetry.ReferenceGuard
+	}
+	ParticipantMetadataUpdatedStub        func(context.Context, *livekit.Room, *livekit.ParticipantInfo)
+	participantMetadataUpdatedMutex       sync.RWMutex
+	participantMetadataUpdatedArgsForCall []struct {
+		arg1 context.Context
+		arg2 *livekit.Room
+		arg3 *livekit.ParticipantInfo
 	}
 	ParticipantResumedStub        func(context.Context, *livekit.Room, *livekit.ParticipantInfo, livekit.NodeID, livekit.ReconnectReason)
 	participantResumedMutex       sync.RWMutex
@@ -709,6 +723,40 @@ func (fake *FakeTelemetryService) NotifyEgressEventArgsForCall(i int) (context.C
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
+func (fake *FakeTelemetryService) NotifyEventAtURL(arg1 context.Context, arg2 *livekit.WebhookEvent, arg3 string) {
+	fake.notifyEventAtURLMutex.Lock()
+	fake.notifyEventAtURLArgsForCall = append(fake.notifyEventAtURLArgsForCall, struct {
+		arg1 context.Context
+		arg2 *livekit.WebhookEvent
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.NotifyEventAtURLStub
+	fake.recordInvocation("NotifyEventAtURL", []interface{}{arg1, arg2, arg3})
+	fake.notifyEventAtURLMutex.Unlock()
+	if stub != nil {
+		fake.NotifyEventAtURLStub(arg1, arg2, arg3)
+	}
+}
+
+func (fake *FakeTelemetryService) NotifyEventAtURLCallCount() int {
+	fake.notifyEventAtURLMutex.RLock()
+	defer fake.notifyEventAtURLMutex.RUnlock()
+	return len(fake.notifyEventAtURLArgsForCall)
+}
+
+func (fake *FakeTelemetryService) NotifyEventAtURLCalls(stub func(context.Context, *livekit.WebhookEvent, string)) {
+	fake.notifyEventAtURLMutex.Lock()
+	defer fake.notifyEventAtURLMutex.Unlock()
+	fake.NotifyEventAtURLStub = stub
+}
+
+func (fake *FakeTelemetryService) NotifyEventAtURLArgsForCall(i int) (context.Context, *livekit.WebhookEvent, string) {
+	fake.notifyEventAtURLMutex.RLock()
+	defer fake.notifyEventAtURLMutex.RUnlock()
+	argsForCall := fake.notifyEventAtURLArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
 func (fake *FakeTelemetryService) ParticipantActive(arg1 context.Context, arg2 *livekit.Room, arg3 *livekit.ParticipantInfo, arg4 *livekit.AnalyticsClientMeta, arg5 bool, arg6 *telemetry.ReferenceGuard) {
 	fake.participantActiveMutex.Lock()
 	fake.participantActiveArgsForCall = append(fake.participantActiveArgsForCall, struct {
@@ -818,6 +866,40 @@ func (fake *FakeTelemetryService) ParticipantLeftArgsForCall(i int) (context.Con
 	defer fake.participantLeftMutex.RUnlock()
 	argsForCall := fake.participantLeftArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
+}
+
+func (fake *FakeTelemetryService) ParticipantMetadataUpdated(arg1 context.Context, arg2 *livekit.Room, arg3 *livekit.ParticipantInfo) {
+	fake.participantMetadataUpdatedMutex.Lock()
+	fake.participantMetadataUpdatedArgsForCall = append(fake.participantMetadataUpdatedArgsForCall, struct {
+		arg1 context.Context
+		arg2 *livekit.Room
+		arg3 *livekit.ParticipantInfo
+	}{arg1, arg2, arg3})
+	stub := fake.ParticipantMetadataUpdatedStub
+	fake.recordInvocation("ParticipantMetadataUpdated", []interface{}{arg1, arg2, arg3})
+	fake.participantMetadataUpdatedMutex.Unlock()
+	if stub != nil {
+		fake.ParticipantMetadataUpdatedStub(arg1, arg2, arg3)
+	}
+}
+
+func (fake *FakeTelemetryService) ParticipantMetadataUpdatedCallCount() int {
+	fake.participantMetadataUpdatedMutex.RLock()
+	defer fake.participantMetadataUpdatedMutex.RUnlock()
+	return len(fake.participantMetadataUpdatedArgsForCall)
+}
+
+func (fake *FakeTelemetryService) ParticipantMetadataUpdatedCalls(stub func(context.Context, *livekit.Room, *livekit.ParticipantInfo)) {
+	fake.participantMetadataUpdatedMutex.Lock()
+	defer fake.participantMetadataUpdatedMutex.Unlock()
+	fake.ParticipantMetadataUpdatedStub = stub
+}
+
+func (fake *FakeTelemetryService) ParticipantMetadataUpdatedArgsForCall(i int) (context.Context, *livekit.Room, *livekit.ParticipantInfo) {
+	fake.participantMetadataUpdatedMutex.RLock()
+	defer fake.participantMetadataUpdatedMutex.RUnlock()
+	argsForCall := fake.participantMetadataUpdatedArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeTelemetryService) ParticipantResumed(arg1 context.Context, arg2 *livekit.Room, arg3 *livekit.ParticipantInfo, arg4 livekit.NodeID, arg5 livekit.ReconnectReason) {

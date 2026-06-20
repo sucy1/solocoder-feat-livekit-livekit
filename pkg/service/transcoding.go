@@ -171,9 +171,8 @@ func (s *TranscodingService) getOutputFile(info *livekit.EgressInfo) string {
 			return result.File.Filename
 		}
 	case *livekit.EgressInfo_Segments:
-		if result.Segments != nil && len(result.Segments.SegmentNames) > 0 {
-			last := result.Segments.SegmentNames[len(result.Segments.SegmentNames)-1]
-			return last
+		if result.Segments != nil && result.Segments.PlaylistLocation != "" {
+			return result.Segments.PlaylistLocation
 		}
 	}
 	return ""

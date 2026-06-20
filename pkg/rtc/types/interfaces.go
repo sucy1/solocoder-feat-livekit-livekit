@@ -678,7 +678,7 @@ type ParticipantTelemetryListener interface {
 	OnTrackMaxSubscribedVideoQuality(pID livekit.ParticipantID, ti *livekit.TrackInfo, mime mime.MimeType, maxQuality livekit.VideoQuality)
 	OnTrackPublishRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, layer int, stats *livekit.RTPStats)
 	OnTrackSubscribeRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, stats *livekit.RTPStats)
-	OnParticipantMetadataUpdated(p types.Participant)
+	OnParticipantMetadataUpdated(p Participant)
 
 	OnTrackStats(key telemetry.StatsKey, stat *livekit.AnalyticsStat)
 }
