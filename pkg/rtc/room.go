@@ -311,6 +311,9 @@ func NewRoom(
 	if r.autoDeleteDelay == 0 {
 		r.autoDeleteDelay = 5 * time.Minute
 	}
+	if r.autoDeleteDelay > 0 && r.autoDeleteDelay < time.Second {
+		r.autoDeleteDelay = time.Second
+	}
 
 	r.parseRoomMetadata()
 
@@ -343,8 +346,12 @@ func (r *Room) parseRoomMetadata() {
 		return
 	}
 
-	if meta.AutoDeleteDelay != nil && *meta.AutoDeleteDelay > 0 {
-		r.autoDeleteDelay = *meta.AutoDeleteDelay
+	if meta.AutoDeleteDelay != nil {
+		delay := *meta.AutoDeleteDelay
+		if delay > 0 && delay < time.Second {
+			delay = time.Second
+		}
+		r.autoDeleteDelay = delay
 	}
 	if meta.WebhookURL != "" {
 		r.webhookURL = meta.WebhookURL
