@@ -223,6 +223,50 @@ func (t *telemetryService) ParticipantLeft(ctx context.Context,
 	})
 }
 
+const (
+	EventParticipantMetadataUpdated = "participant_metadata_updated"
+	maxWebhookRetries               = 3
+	webhookRetryInterval            = 500 * time.Millisecond
+)
+
+func (t *telemetryService) ParticipantMetadataUpdated(
+	ctx context.Context,
+	room *livekit.Room,
+	participant *livekit.ParticipantInfo,
+) {
+	t.enqueue(func() {
+		t.NotifyEvent(ctx, &livekit.WebhookEvent{
+			Event:       EventParticipantMetadataUpdated,
+			Room:        room,
+			Participant: participant,
+		})
+	})
+}
+
+func (t *telemetryService) NotifyEventAtURL(ctx context.Context, event *livekit.WebhookEvent, url string) {
+	if t.notifier == nil || url == "" {
+		return
+	}
+
+	event.CreatedAt = time.Now().Unix()
+	event.Id = guid.New("EV_")
+
+	var err error
+	for i := 0; i < maxWebhookRetries; i++ {
+		if i > 0 {
+			time.Sleep(webhookRetryInterval)
+		}
+		err = t.notifier.QueueNotify(ctx, event, webhook.WithURL(url))
+		if err == nil {
+			return
+		}
+		logger.Warnw("failed to notify webhook (retrying)", err, "event", event.Event, "attempt", i+1, "url", url)
+	}
+	if err != nil {
+		logger.Warnw("failed to notify webhook after retries", err, "event", event.Event, "url", url)
+	}
+}
+
 func (t *telemetryService) TrackPublishRequested(
 	ctx context.Context,
 	roomID livekit.RoomID,

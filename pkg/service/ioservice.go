@@ -31,12 +31,17 @@ import (
 type IOInfoService struct {
 	ioServer rpc.IOInfoServer
 
-	es        EgressStore
-	is        IngressStore
-	ss        SIPStore
-	telemetry telemetry.TelemetryService
+	es          EgressStore
+	is          IngressStore
+	ss          SIPStore
+	telemetry   telemetry.TelemetryService
+	transcoding *TranscodingService
 
 	shutdown chan struct{}
+}
+
+func (s *IOInfoService) SetTranscodingService(t *TranscodingService) {
+	s.transcoding = t
 }
 
 func NewIOInfoService(
@@ -126,6 +131,9 @@ func (s *IOInfoService) UpdateEgress(ctx context.Context, info *livekit.EgressIn
 		livekit.EgressStatus_EGRESS_ABORTED,
 		livekit.EgressStatus_EGRESS_LIMIT_REACHED:
 		s.telemetry.EgressEnded(ctx, info)
+		if s.transcoding != nil {
+			s.transcoding.OnEgressEnded(ctx, info)
+		}
 	}
 
 	if err != nil {

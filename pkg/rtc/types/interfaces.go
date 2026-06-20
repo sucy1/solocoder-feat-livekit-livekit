@@ -678,6 +678,7 @@ type ParticipantTelemetryListener interface {
 	OnTrackMaxSubscribedVideoQuality(pID livekit.ParticipantID, ti *livekit.TrackInfo, mime mime.MimeType, maxQuality livekit.VideoQuality)
 	OnTrackPublishRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, layer int, stats *livekit.RTPStats)
 	OnTrackSubscribeRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, stats *livekit.RTPStats)
+	OnParticipantMetadataUpdated(p types.Participant)
 
 	OnTrackStats(key telemetry.StatsKey, stat *livekit.AnalyticsStat)
 }
@@ -713,6 +714,8 @@ func (NullParticipantTelemetryListener) OnTrackMaxSubscribedVideoQuality(pID liv
 func (NullParticipantTelemetryListener) OnTrackPublishRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, layer int, stats *livekit.RTPStats) {
 }
 func (NullParticipantTelemetryListener) OnTrackSubscribeRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, stats *livekit.RTPStats) {
+}
+func (NullParticipantTelemetryListener) OnParticipantMetadataUpdated(p Participant) {
 }
 
 func (NullParticipantTelemetryListener) OnTrackStats(key telemetry.StatsKey, stat *livekit.AnalyticsStat) {

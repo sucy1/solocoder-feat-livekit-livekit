@@ -214,11 +214,18 @@ var (
 // ---------------------------------------------------------------------------
 
 type StreamAllocatorParams struct {
-	Config    StreamAllocatorConfig
-	BWE       bwe.BWE
-	Pacer     pacer.Pacer
-	RTTGetter func() (float64, bool)
-	Logger    logger.Logger
+	Config             StreamAllocatorConfig
+	BWE                bwe.BWE
+	Pacer              pacer.Pacer
+	RTTGetter          func() (float64, bool)
+	Logger             logger.Logger
+	BandwidthEstimator BandwidthEstimatorParams
+}
+
+type BandwidthEstimatorParams struct {
+	Enabled       bool
+	EstimateCycle time.Duration
+	MaxBitratePct float64
 }
 
 type StreamAllocator struct {
@@ -233,6 +240,12 @@ type StreamAllocator struct {
 
 	committedChannelCapacity  int64
 	overriddenChannelCapacity int64
+
+	clientEstimatedBandwidth     int64
+	clientBandwidthEstimatorEnabled bool
+	clientBandwidthEstimateCycle  time.Duration
+	maxBitratePct                float64
+	lastClientBandwidthEstimate   time.Time
 
 	prober *ccutils.Prober
 
@@ -258,13 +271,24 @@ type StreamAllocator struct {
 }
 
 func NewStreamAllocator(params StreamAllocatorParams, enabled bool, allowPause bool) *StreamAllocator {
+	maxBitratePct := params.BandwidthEstimator.MaxBitratePct
+	if maxBitratePct <= 0 || maxBitratePct > 1 {
+		maxBitratePct = 0.9
+	}
+	estimateCycle := params.BandwidthEstimator.EstimateCycle
+	if estimateCycle <= 0 {
+		estimateCycle = 2 * time.Second
+	}
 	s := &StreamAllocator{
-		params:               params,
-		enabled:              enabled,
-		allowPause:           allowPause,
-		videoTracks:          make(map[livekit.TrackID]*Track),
-		state:                streamAllocatorStateStable,
-		activeProbeClusterId: ccutils.ProbeClusterIdInvalid,
+		params:                          params,
+		enabled:                         enabled,
+		allowPause:                      allowPause,
+		videoTracks:                     make(map[livekit.TrackID]*Track),
+		state:                           streamAllocatorStateStable,
+		activeProbeClusterId:            ccutils.ProbeClusterIdInvalid,
+		clientBandwidthEstimatorEnabled: params.BandwidthEstimator.Enabled,
+		clientBandwidthEstimateCycle:    estimateCycle,
+		maxBitratePct:                   maxBitratePct,
 		eventsQueue: utils.NewTypedOpsQueue[Event](utils.OpsQueueParams{
 			Name:    "stream-allocator",
 			MinSize: 64,
@@ -1273,7 +1297,37 @@ func (s *StreamAllocator) getAvailableChannelCapacity(allowOverride bool) int64 
 		)
 	}
 
+	if s.clientBandwidthEstimatorEnabled && s.clientEstimatedBandwidth > 0 {
+		clientAllowedCapacity := int64(float64(s.clientEstimatedBandwidth) * s.maxBitratePct)
+		if clientAllowedCapacity < availableChannelCapacity {
+			s.params.Logger.Debugw(
+				"stream allocator: limiting channel capacity based on client estimate",
+				"actual", availableChannelCapacity,
+				"clientEstimate", s.clientEstimatedBandwidth,
+				"maxBitratePct", s.maxBitratePct,
+				"limited", clientAllowedCapacity,
+			)
+			availableChannelCapacity = clientAllowedCapacity
+		}
+	}
+
 	return availableChannelCapacity
+}
+
+func (s *StreamAllocator) SetClientEstimatedBandwidth(bandwidthBps int64) {
+	if !s.clientBandwidthEstimatorEnabled {
+		return
+	}
+	s.clientEstimatedBandwidth = bandwidthBps
+	s.lastClientBandwidthEstimate = time.Now()
+}
+
+func (s *StreamAllocator) IsClientBandwidthEstimatorEnabled() bool {
+	return s.clientBandwidthEstimatorEnabled
+}
+
+func (s *StreamAllocator) GetClientBandwidthEstimateCycle() time.Duration {
+	return s.clientBandwidthEstimateCycle
 }
 
 func (s *StreamAllocator) getExpectedBandwidthUsage() int64 {

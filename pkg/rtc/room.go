@@ -16,6 +16,7 @@ package rtc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -151,6 +152,10 @@ type Room struct {
 	onStateChangeMu              sync.Mutex
 	localParticipantListener     types.LocalParticipantListener
 	participantTelemetryListener types.ParticipantTelemetryListener
+
+	autoDeleteDelay time.Duration
+	autoDeleteTimer *time.Timer
+	webhookURL      string
 }
 
 type ParticipantOptions struct {
@@ -301,6 +306,14 @@ func NewRoom(
 		r.protoRoom.CreationTime = now.Unix()
 		r.protoRoom.CreationTimeMs = now.UnixMilli()
 	}
+
+	r.autoDeleteDelay = roomConfig.AutoDeleteDelay
+	if r.autoDeleteDelay == 0 {
+		r.autoDeleteDelay = 5 * time.Minute
+	}
+
+	r.parseRoomMetadata()
+
 	r.protoProxy = utils.NewProtoProxy(roomUpdateInterval, r.updateProto)
 
 	r.createAgentDispatchesFromRoomAgent()
@@ -313,6 +326,79 @@ func NewRoom(
 	go r.simulationCleanupWorker()
 
 	return r
+}
+
+type roomMetadataConfig struct {
+	AutoDeleteDelay *time.Duration `json:"auto_delete_delay,omitempty"`
+	WebhookURL      string         `json:"webhook_url,omitempty"`
+}
+
+func (r *Room) parseRoomMetadata() {
+	if r.protoRoom.Metadata == "" {
+		return
+	}
+
+	var meta roomMetadataConfig
+	if err := json.Unmarshal([]byte(r.protoRoom.Metadata), &meta); err != nil {
+		return
+	}
+
+	if meta.AutoDeleteDelay != nil && *meta.AutoDeleteDelay > 0 {
+		r.autoDeleteDelay = *meta.AutoDeleteDelay
+	}
+	if meta.WebhookURL != "" {
+		r.webhookURL = meta.WebhookURL
+	}
+}
+
+func (r *Room) GetWebhookURL() string {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.webhookURL
+}
+
+func (r *Room) cancelAutoDeleteLocked() {
+	if r.autoDeleteTimer != nil {
+		r.autoDeleteTimer.Stop()
+		r.autoDeleteTimer = nil
+	}
+}
+
+func (r *Room) scheduleAutoDeleteIfEmptyLocked() {
+	if r.IsClosed() || r.holds.Load() > 0 {
+		return
+	}
+
+	for _, p := range r.participants {
+		if !p.IsDependent() {
+			return
+		}
+	}
+
+	if r.autoDeleteDelay <= 0 {
+		return
+	}
+
+	r.cancelAutoDeleteLocked()
+
+	r.autoDeleteTimer = time.AfterFunc(r.autoDeleteDelay, func() {
+		r.lock.Lock()
+		if r.IsClosed() {
+			r.lock.Unlock()
+			return
+		}
+
+		for _, p := range r.participants {
+			if !p.IsDependent() {
+				r.lock.Unlock()
+				return
+			}
+		}
+		r.lock.Unlock()
+
+		r.Close(types.ParticipantCloseReasonRoomClosed)
+		r.logger.Infow("closing idle room due to auto delete delay", "delay", r.autoDeleteDelay)
+	})
 }
 
 func (r *Room) Logger() logger.Logger {
@@ -453,6 +539,8 @@ func (r *Room) Join(
 	if r.participants[participant.Identity()] != nil {
 		return ErrAlreadyJoined
 	}
+
+	r.cancelAutoDeleteLocked()
 	if r.protoRoom.MaxParticipants > 0 && !participant.IsDependent() {
 		numParticipants := uint32(0)
 		for _, p := range r.participants {
@@ -1475,6 +1563,8 @@ func (r *Room) RemoveParticipant(
 
 	r.leftAt.Store(time.Now().Unix())
 
+	r.scheduleAutoDeleteIfEmptyLocked()
+
 	if sendUpdates {
 		if r.onParticipantChanged != nil {
 			r.onParticipantChanged(p)
@@ -2012,6 +2102,8 @@ func (l *localParticipantListener) OnLeave(p types.LocalParticipant, closeReason
 
 var _ types.ParticipantTelemetryListener = (*participantTelemetryListener)(nil)
 
+const EventParticipantMetadataUpdated = "participant_metadata_updated"
+
 type participantTelemetryListener struct {
 	room *Room
 }
@@ -2069,6 +2161,21 @@ func (l participantTelemetryListener) OnTrackPublishRTPStats(pID livekit.Partici
 
 func (l participantTelemetryListener) OnTrackSubscribeRTPStats(pID livekit.ParticipantID, trackID livekit.TrackID, mimeType mime.MimeType, stats *livekit.RTPStats) {
 	l.room.telemetry.TrackSubscribeRTPStats(context.Background(), l.room.ID(), l.room.Name(), pID, trackID, mimeType, stats)
+}
+
+func (l participantTelemetryListener) OnParticipantMetadataUpdated(p types.Participant) {
+	roomProto := l.room.ToProto()
+	participantProto := p.ToProto()
+	l.room.telemetry.ParticipantMetadataUpdated(context.Background(), roomProto, participantProto)
+
+	webhookURL := l.room.GetWebhookURL()
+	if webhookURL != "" {
+		l.room.telemetry.NotifyEventAtURL(context.Background(), &livekit.WebhookEvent{
+			Event:       EventParticipantMetadataUpdated,
+			Room:        roomProto,
+			Participant: participantProto,
+		}, webhookURL)
+	}
 }
 
 func (l participantTelemetryListener) OnTrackStats(key telemetry.StatsKey, stat *livekit.AnalyticsStat) {

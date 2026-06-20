@@ -45,6 +45,8 @@ type TelemetryService interface {
 	ParticipantResumed(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo, nodeID livekit.NodeID, reason livekit.ReconnectReason)
 	// ParticipantLeft - the participant leaves the room, only sent if ParticipantActive has been called before
 	ParticipantLeft(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo, shouldSendEvent bool, guard *ReferenceGuard)
+	// ParticipantMetadataUpdated - participant metadata has been updated
+	ParticipantMetadataUpdated(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo)
 	// TrackPublishRequested - a publication attempt has been received
 	TrackPublishRequested(ctx context.Context, roomID livekit.RoomID, roomName livekit.RoomName, participantID livekit.ParticipantID, identity livekit.ParticipantIdentity, track *livekit.TrackInfo)
 	// TrackPublished - a publication attempt has been successful
@@ -91,6 +93,7 @@ type TelemetryService interface {
 	// helpers
 	AnalyticsService
 	NotifyEgressEvent(ctx context.Context, event string, info *livekit.EgressInfo)
+	NotifyEventAtURL(ctx context.Context, event *livekit.WebhookEvent, url string)
 	FlushStats()
 }
 
@@ -113,6 +116,8 @@ func (n NullTelemetryService) ParticipantActive(ctx context.Context, room *livek
 func (n NullTelemetryService) ParticipantResumed(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo, nodeID livekit.NodeID, reason livekit.ReconnectReason) {
 }
 func (n NullTelemetryService) ParticipantLeft(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo, shouldSendEvent bool, guard *ReferenceGuard) {
+}
+func (n NullTelemetryService) ParticipantMetadataUpdated(ctx context.Context, room *livekit.Room, participant *livekit.ParticipantInfo) {
 }
 func (n NullTelemetryService) TrackPublishRequested(ctx context.Context, roomID livekit.RoomID, roomName livekit.RoomName, participantID livekit.ParticipantID, identity livekit.ParticipantIdentity, track *livekit.TrackInfo) {
 }
@@ -153,6 +158,8 @@ func (n NullTelemetryService) Report(ctx context.Context, reportInfo *livekit.Re
 func (n NullTelemetryService) APICall(ctx context.Context, apiCallInfo *livekit.APICallInfo)        {}
 func (n NullTelemetryService) Webhook(ctx context.Context, webhookInfo *livekit.WebhookInfo)        {}
 func (n NullTelemetryService) NotifyEgressEvent(ctx context.Context, event string, info *livekit.EgressInfo) {
+}
+func (n NullTelemetryService) NotifyEventAtURL(ctx context.Context, event *livekit.WebhookEvent, url string) {
 }
 func (n NullTelemetryService) FlushStats() {}
 

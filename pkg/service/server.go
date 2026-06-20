@@ -62,6 +62,7 @@ type LivekitServer struct {
 	running      atomic.Bool
 	doneChan     chan struct{}
 	closedChan   chan struct{}
+	transcoding  *TranscodingService
 }
 
 func NewLivekitServer(conf *config.Config,
@@ -94,7 +95,10 @@ func NewLivekitServer(conf *config.Config,
 		turnServer:  turnServer,
 		currentNode: currentNode,
 		closedChan:  make(chan struct{}),
+		transcoding: NewTranscodingService(conf.Transcoding),
 	}
+
+	ioService.SetTranscodingService(s.transcoding)
 
 	middlewares := []negroni.Handler{
 		// always first
@@ -364,6 +368,8 @@ func (s *LivekitServer) Stop(force bool) {
 	if !s.running.Swap(false) {
 		return
 	}
+
+	s.transcoding.Stop()
 
 	s.router.Stop()
 	close(s.doneChan)

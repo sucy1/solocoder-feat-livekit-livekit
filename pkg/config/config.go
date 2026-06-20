@@ -92,6 +92,17 @@ type Config struct {
 	EnableDataTracks bool `yaml:"enable_data_tracks,omitempty"`
 
 	API APIConfig `yaml:"api,omitempty"`
+
+	Transcoding TranscodingConfig `yaml:"transcoding,omitempty"`
+
+	BandwidthEstimator BandwidthEstimatorConfig `yaml:"bandwidth_estimator,omitempty"`
+
+	RPC RPCTimeoutConfig `yaml:"rpc,omitempty"`
+}
+
+type RPCTimeoutConfig struct {
+	DefaultTimeout time.Duration `yaml:"default_timeout,omitempty"`
+	MaxTimeout     time.Duration `yaml:"max_timeout,omitempty"`
 }
 
 type RTCConfig struct {
@@ -220,6 +231,24 @@ type RoomConfig struct {
 	// deprecated, moved to limits
 	MaxParticipantIdentityLength int                                   `yaml:"max_participant_identity_length,omitempty"`
 	RoomConfigurations           map[string]*livekit.RoomConfiguration `yaml:"room_configurations,omitempty"`
+	// delay before auto-deleting empty room, default 5 minutes
+	AutoDeleteDelay time.Duration `yaml:"auto_delete_delay,omitempty"`
+}
+
+type TranscodingConfig struct {
+	Enabled          bool          `yaml:"enabled,omitempty"`
+	OutputFormat     string        `yaml:"output_format,omitempty"`
+	OutputResolution string        `yaml:"output_resolution,omitempty"`
+	MaxConcurrency   int           `yaml:"max_concurrency,omitempty"`
+	KeepOriginal     bool          `yaml:"keep_original,omitempty"`
+	FFmpegPath       string        `yaml:"ffmpeg_path,omitempty"`
+	Timeout          time.Duration `yaml:"timeout,omitempty"`
+}
+
+type BandwidthEstimatorConfig struct {
+	Enabled       bool          `yaml:"enabled,omitempty"`
+	EstimateCycle time.Duration `yaml:"estimate_cycle,omitempty"`
+	MaxBitratePct float64       `yaml:"max_bitrate_pct,omitempty"`
 }
 
 type CodecSpec struct {
@@ -438,6 +467,7 @@ var DefaultConfig = Config{
 		CreateRoomTimeout:     10 * time.Second,
 		CreateRoomAttempts:    3,
 		UpdateBatchTargetSize: 128 * 1024,
+		AutoDeleteDelay:       5 * time.Minute,
 	},
 	Limit: LimitConfig{
 		MaxMetadataSize:              512 * 1024,
@@ -478,6 +508,24 @@ var DefaultConfig = Config{
 	NodeStats:        DefaultNodeStatsConfig,
 	API:              DefaultAPIConfig(),
 	EnableDataTracks: true,
+	Transcoding: TranscodingConfig{
+		Enabled:          false,
+		OutputFormat:     "mp4",
+		OutputResolution: "1920x1080",
+		MaxConcurrency:   3,
+		KeepOriginal:     true,
+		FFmpegPath:       "ffmpeg",
+		Timeout:          30 * time.Minute,
+	},
+	BandwidthEstimator: BandwidthEstimatorConfig{
+		Enabled:       false,
+		EstimateCycle: 2 * time.Second,
+		MaxBitratePct: 0.9,
+	},
+	RPC: RPCTimeoutConfig{
+		DefaultTimeout: 10 * time.Second,
+		MaxTimeout:     60 * time.Second,
+	},
 }
 
 func NewConfig(confString string, strictMode bool, c *cli.Command, baseFlags []cli.Flag) (*Config, error) {

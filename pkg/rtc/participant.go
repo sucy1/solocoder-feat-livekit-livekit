@@ -747,6 +747,10 @@ func (p *ParticipantImpl) SetMetadata(metadata string) {
 
 	p.listener().OnParticipantUpdate(p)
 
+	if tl := p.GetTelemetryListener(); tl != nil {
+		tl.OnParticipantMetadataUpdated(p)
+	}
+
 	if onClaimsChanged != nil {
 		onClaimsChanged(p)
 	}
